@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Migration Dashboard</title>
+    <!-- Switch to Outfit Font for a premium tech aesthetic -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <!-- JetBrains Mono for the terminal -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="noise-overlay"></div>
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+    
+    <div class="dashboard-container glass-panel">
+        <header>
+            <div class="logo">
+                <div class="logo-icon"></div>
+                <h1>Migration <span>Engine</span></h1>
+            </div>
+            <div class="status-indicator">
+                <span id="status-dot" class="dot ready"></span>
+                <span id="status-text">System Ready</span>
+            </div>
+        </header>
+        
+        <main>
+            <section class="controls">
+                <div class="card glass-panel-inner gradient-border">
+                    <h2>Configuration</h2>
+                    <div class="config-grid">
+                        <div class="config-item">
+                            <label>Source</label>
+                            <div class="tag oracle">Oracle Database</div>
+                        </div>
+                        <div class="config-item">
+                            <label>Destination</label>
+                            <div class="tag postgres">PostgreSQL</div>
+                        </div>
+                        <div class="config-item">
+                            <label>Batch Size</label>
+                            <div class="tag neutral">10,000 rows</div>
+                        </div>
+                    </div>
+                    
+                    <button id="start-btn" class="primary-btn glow-effect">
+                        <span class="btn-text">INITIALIZE PIPELINE</span>
+                        <div class="btn-glow"></div>
+                    </button>
+                </div>
+                
+                <div class="card metrics glass-panel-inner gradient-border" id="metrics-card">
+                    <h2>Live Metrics</h2>
+                    <div class="metric-row">
+                        <span>Phase</span>
+                        <span id="metric-phase" class="metric-value">Idle</span>
+                    </div>
+                    <div class="metric-row">
+                        <span>Rows Processed</span>
+                        <span id="metric-rows" class="metric-value">0</span>
+                    </div>
+                    <div class="metric-row">
+                        <span>Integrity Hash</span>
+                        <span id="metric-hash" class="metric-value hash-value">-</span>
+                    </div>
+                </div>
+            </section>
+            
+            <section class="terminal glass-panel-inner gradient-border">
+                <div class="terminal-header">
+                    <div class="window-controls">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <div class="terminal-title">live_migration.log</div>
+                </div>
+                <div class="terminal-body" id="log-output">
+                    <div class="log-line system">Ready to commence Oracle -> PostgreSQL automated migration...</div>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <script src="/static/script.js"></script>
+</body>
+</html>

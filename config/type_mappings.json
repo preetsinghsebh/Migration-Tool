@@ -1,0 +1,23 @@
+{
+  "mappings": {
+    "VARCHAR2": "VARCHAR",
+    "NVARCHAR2": "VARCHAR",
+    "NUMBER": "NUMERIC",
+    "DATE": "TIMESTAMP",
+    "CLOB": "TEXT",
+    "NCLOB": "TEXT",
+    "BLOB": "BYTEA",
+    "CHAR": "CHAR",
+    "NCHAR": "CHAR",
+    "TIMESTAMP": "TIMESTAMP",
+    "TIMESTAMP WITH TIME ZONE": "TIMESTAMP WITH TIME ZONE",
+    "TIMESTAMP WITH LOCAL TIME ZONE": "TIMESTAMP WITH TIME ZONE",
+    "FLOAT": "DOUBLE PRECISION",
+    "BINARY_FLOAT": "REAL",
+    "BINARY_DOUBLE": "DOUBLE PRECISION",
+    "RAW": "BYTEA",
+    "LONG": "TEXT",
+    "LONG RAW": "BYTEA"
+  },
+  "fallback": "TEXT"
+}
