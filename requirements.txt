@@ -1,3 +1,9 @@
 oracledb==2.1.2
 psycopg2-binary==2.9.9
 python-dotenv==1.0.0
+fastapi>=0.100.0
+uvicorn>=0.22.0
+sse-starlette>=1.6.0
+python-multipart>=0.0.6
+
+

@@ -118,4 +118,60 @@ document.addEventListener("DOMContentLoaded", () => {
             finishMigration();
         }
     });
+
+    // CSV Upload Handler
+    const uploadForm = document.getElementById("upload-form");
+    const tableNameInput = document.getElementById("table-name-input");
+    const csvFileInput = document.getElementById("csv-file-input");
+    const uploadStatus = document.getElementById("upload-status");
+    const uploadBtn = document.getElementById("upload-btn");
+
+    uploadForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        
+        const tableName = tableNameInput.value.trim().toUpperCase();
+        const file = csvFileInput.files[0];
+        
+        if (!tableName || !file) return;
+        
+        uploadStatus.style.display = "block";
+        uploadStatus.style.color = "var(--accent-cyan)";
+        uploadStatus.textContent = "Loading CSV into Oracle...";
+        uploadBtn.disabled = true;
+        
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("table_name", tableName);
+        
+        try {
+            const response = await fetch("/api/upload", {
+                method: "POST",
+                body: formData
+            });
+            const data = await response.json();
+            
+            if (response.ok && data.status === "success") {
+                uploadStatus.style.color = "var(--success-green)";
+                uploadStatus.textContent = data.message;
+                
+                // Print upload completion directly to terminal log
+                appendLog(`[UPLOAD] Loaded CSV data into Oracle table '${tableName}' successfully.`);
+                
+                // Clear input fields
+                tableNameInput.value = "";
+                csvFileInput.value = "";
+            } else {
+                uploadStatus.style.color = "var(--oracle-red)";
+                uploadStatus.textContent = `ERROR: ${data.message || "Failed to load CSV."}`;
+                appendLog(`[ERROR] File upload failed: ${data.message || "Unknown error."}`);
+            }
+        } catch (err) {
+            uploadStatus.style.color = "var(--oracle-red)";
+            uploadStatus.textContent = `ERROR: Failed to connect to server.`;
+            appendLog(`[ERROR] Connection error during upload: ${err}`);
+        } finally {
+            uploadBtn.disabled = false;
+        }
+    });
 });
+

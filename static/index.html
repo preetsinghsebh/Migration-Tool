@@ -55,6 +55,25 @@
                     </button>
                 </div>
                 
+                <div class="card glass-panel-inner gradient-border" id="upload-card">
+                    <h2>Import Custom Data</h2>
+                    <form id="upload-form" class="upload-form">
+                        <div class="form-group">
+                            <label for="table-name-input">Oracle Table Name</label>
+                            <input type="text" id="table-name-input" class="text-input" placeholder="e.g. CUSTOMERS" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="csv-file-input">Select CSV File</label>
+                            <input type="file" id="csv-file-input" class="file-input" accept=".csv" required>
+                        </div>
+                        <button type="submit" id="upload-btn" class="primary-btn glow-effect" style="padding: 0.9rem; font-size: 0.9rem; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));">
+                            <span class="btn-text">LOAD INTO ORACLE</span>
+                            <div class="btn-glow"></div>
+                        </button>
+                    </form>
+                    <div id="upload-status" style="margin-top: 12px; font-size: 0.85rem; display: none; font-weight: 500; font-family: 'JetBrains Mono', monospace;"></div>
+                </div>
+                
                 <div class="card metrics glass-panel-inner gradient-border" id="metrics-card">
                     <h2>Live Metrics</h2>
                     <div class="metric-row">
