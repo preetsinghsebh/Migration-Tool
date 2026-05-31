@@ -126,6 +126,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const uploadStatus = document.getElementById("upload-status");
     const uploadBtn = document.getElementById("upload-btn");
 
+    // Download Handler Elements
+    const downloadBtn = document.getElementById("download-btn");
+    const downloadTableInput = document.getElementById("download-table-input");
+    const downloadStatus = document.getElementById("download-status");
+
     // Auto-populate table name from file name when chosen
     csvFileInput.addEventListener("change", () => {
         const file = csvFileInput.files[0];
@@ -166,6 +171,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Print upload completion directly to terminal log
                 appendLog(`[UPLOAD] Loaded CSV data into Oracle table '${tableName}' successfully.`);
                 
+                // Pre-populate download input for convenience
+                downloadTableInput.value = tableName;
+                
                 // Clear input fields
                 tableNameInput.value = "";
                 csvFileInput.value = "";
@@ -180,6 +188,57 @@ document.addEventListener("DOMContentLoaded", () => {
             appendLog(`[ERROR] Connection error during upload: ${err}`);
         } finally {
             uploadBtn.disabled = false;
+        }
+    });
+
+    // Handle CSV Download Click
+    downloadBtn.addEventListener("click", async () => {
+        const tableName = downloadTableInput.value.trim().toUpperCase();
+        if (!tableName) {
+            downloadStatus.style.display = "block";
+            downloadStatus.textContent = "Please enter a table name.";
+            return;
+        }
+        
+        downloadStatus.style.display = "block";
+        downloadStatus.style.color = "var(--accent-cyan)";
+        downloadStatus.textContent = "Generating CSV download...";
+        
+        try {
+            const response = await fetch(`/api/download/${tableName}`);
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                
+                const disposition = response.headers.get('content-disposition');
+                let filename = `${tableName}_postgres.csv`;
+                if (disposition && disposition.indexOf('attachment') !== -1) {
+                    const filenameRegex = /filename[^;=\n]*=((['"])(.*?)\2|[^;\n]*)/;
+                    const matches = filenameRegex.exec(disposition);
+                    if (matches != null && matches[3]) {
+                        filename = matches[3];
+                    }
+                }
+                
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+                
+                downloadStatus.style.display = "none";
+                appendLog(`[DOWNLOAD] Exported PostgreSQL table '${tableName}' to CSV file successfully.`);
+            } else {
+                const data = await response.json();
+                downloadStatus.style.color = "var(--oracle-red)";
+                downloadStatus.textContent = `ERROR: ${data.message || "Table not found."}`;
+            }
+        } catch (err) {
+            downloadStatus.style.color = "var(--oracle-red)";
+            downloadStatus.textContent = "ERROR: Failed to connect to server.";
+            appendLog(`[ERROR] Connection error during download: ${err}`);
         }
     });
 });

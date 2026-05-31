@@ -72,6 +72,18 @@
                         </button>
                     </form>
                     <div id="upload-status" style="margin-top: 12px; font-size: 0.85rem; display: none; font-weight: 500; font-family: 'JetBrains Mono', monospace;"></div>
+                    
+                    <div class="download-section" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 15px;">
+                        <h2 style="font-size: 0.85rem; letter-spacing: 2px; margin-bottom: 10px;">Export PostgreSQL CSV</h2>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" id="download-table-input" class="text-input" placeholder="e.g. DATA_ORACLE" style="padding: 0.6rem 0.8rem; font-size: 0.9rem; flex: 2;">
+                            <button id="download-btn" class="primary-btn glow-effect" style="flex: 1; padding: 0.6rem; font-size: 0.8rem; letter-spacing: 1px; background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink)); width: auto;">
+                                <span class="btn-text">DOWNLOAD</span>
+                                <div class="btn-glow"></div>
+                            </button>
+                        </div>
+                        <div id="download-status" style="margin-top: 10px; font-size: 0.8rem; display: none; font-weight: 500; font-family: 'JetBrains Mono', monospace; color: var(--oracle-red);"></div>
+                    </div>
                 </div>
                 
                 <div class="card metrics glass-panel-inner gradient-border" id="metrics-card">
@@ -105,6 +117,6 @@
         </main>
     </div>
     
-    <script src="/static/script.js?v=3"></script>
+    <script src="/static/script.js?v=4"></script>
 </body>
 </html>

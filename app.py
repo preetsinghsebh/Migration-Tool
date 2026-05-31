@@ -8,7 +8,7 @@ import io
 import csv
 import os
 from fastapi import FastAPI, BackgroundTasks, Request, UploadFile, File, Form
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
@@ -156,6 +156,71 @@ async def upload_csv(file: UploadFile = File(...), table_name: str = Form(...)):
     except Exception as e:
         logging.error(f"Error handling CSV upload: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "message": f"Failed to load CSV: {str(e)}"})
+
+@app.get("/api/download/{table_name}")
+async def download_postgres_csv(table_name: str):
+    t_name = table_name.strip().upper()
+    if not t_name:
+        return JSONResponse(status_code=400, content={"status": "error", "message": "Table name cannot be empty."})
+        
+    pg_host = os.getenv("PG_HOST", "localhost")
+    pg_port = os.getenv("PG_PORT", "5432")
+    pg_dbname = os.getenv("PG_DB", "target_db")
+    pg_user = os.getenv("PG_USER", "postgres")
+    pg_pass = os.getenv("PG_PASSWORD", "secret")
+    
+    from connectors.postgres import PostgresConnector
+    pg_connector = PostgresConnector(pg_host, pg_port, pg_dbname, pg_user, pg_pass)
+    try:
+        pg_connector.initialize_pool()
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": f"Failed to connect to PostgreSQL: {str(e)}"})
+        
+    try:
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        with pg_connector.get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = %s",
+                    [t_name]
+                )
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute(
+                        "SELECT COUNT(*) FROM information_schema.tables WHERE LOWER(table_name) = LOWER(%s)",
+                        [t_name]
+                    )
+                    if cursor.fetchone()[0] == 0:
+                        pg_connector.close_pool()
+                        return JSONResponse(status_code=404, content={"status": "error", "message": f"Table '{t_name}' does not exist in PostgreSQL."})
+
+                cursor.execute(f'SELECT * FROM "{t_name}"')
+                headers = [col[0] for col in cursor.description]
+                writer.writerow(headers)
+                
+                while True:
+                    rows = cursor.fetchmany(1000)
+                    if not rows:
+                        break
+                    writer.writerows(rows)
+                    
+        pg_connector.close_pool()
+        
+        output.seek(0)
+        headers_resp = {
+            'Content-Disposition': f'attachment; filename="{t_name}_postgres.csv"',
+            'Access-Control-Expose-Headers': 'Content-Disposition'
+        }
+        return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers=headers_resp)
+        
+    except Exception as e:
+        logging.error(f"Failed to export table {t_name}: {e}")
+        try:
+            pg_connector.close_pool()
+        except Exception:
+            pass
+        return JSONResponse(status_code=500, content={"status": "error", "message": f"Export failed: {str(e)}"})
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
