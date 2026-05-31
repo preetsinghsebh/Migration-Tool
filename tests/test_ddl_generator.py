@@ -80,7 +80,7 @@ class TestDDLGenerator(unittest.TestCase):
             self.assertEqual(count, 2)
             
             # Verify USERS table SQL
-            users_sql_path = os.path.join(output_dir, "USERS.sql")
+            users_sql_path = os.path.join(output_dir, "tables", "USERS.sql")
             self.assertTrue(os.path.exists(users_sql_path))
             with open(users_sql_path, 'r', encoding='utf-8') as f:
                 users_sql = f.read()
@@ -91,7 +91,7 @@ class TestDDLGenerator(unittest.TestCase):
             self.assertIn("CONSTRAINT UQ_USERNAME UNIQUE (USERNAME)", users_sql)
             
             # Verify ORDERS table SQL
-            orders_sql_path = os.path.join(output_dir, "ORDERS.sql")
+            orders_sql_path = os.path.join(output_dir, "tables", "ORDERS.sql")
             self.assertTrue(os.path.exists(orders_sql_path))
             with open(orders_sql_path, 'r', encoding='utf-8') as f:
                 orders_sql = f.read()
@@ -99,9 +99,16 @@ class TestDDLGenerator(unittest.TestCase):
             self.assertIn("CREATE TABLE ORDERS (", orders_sql)
             self.assertIn("ORDER_ID NUMERIC NOT NULL", orders_sql)
             self.assertIn("CONSTRAINT PK_ORDERS PRIMARY KEY (ORDER_ID)", orders_sql)
-            self.assertIn("ALTER TABLE ORDERS", orders_sql)
-            self.assertIn("ADD CONSTRAINT FK_ORDERS_USER FOREIGN KEY (USER_ID)", orders_sql)
-            self.assertIn("REFERENCES /* TODO: resolve PK_USERS */", orders_sql)
+            
+            # Verify constraints SQL
+            constraints_sql_path = os.path.join(output_dir, "constraints.sql")
+            self.assertTrue(os.path.exists(constraints_sql_path))
+            with open(constraints_sql_path, 'r', encoding='utf-8') as f:
+                constraints_sql = f.read()
+                
+            self.assertIn("ALTER TABLE ORDERS", constraints_sql)
+            self.assertIn("ADD CONSTRAINT FK_ORDERS_USER FOREIGN KEY (USER_ID)", constraints_sql)
+            self.assertIn("REFERENCES USERS (ID)", constraints_sql)
             
             self.logger.info("DDL Generator output verified successfully.")
             

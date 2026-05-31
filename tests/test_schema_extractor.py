@@ -111,5 +111,37 @@ class TestSchemaExtractor(unittest.TestCase):
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
 
+    @patch('connectors.oracle.oracledb.create_pool')
+    def test_sequence_extraction(self, mock_oracledb_pool):
+        mock_oracle_conn = MagicMock()
+        mock_oracle_cursor = MagicMock()
+
+        # Mock sequence query results
+        mock_oracle_cursor.__iter__.return_value = iter([
+            ("SEQ_USERS", 1, 999999, 1, "N", 20, 42)
+        ])
+        mock_oracle_conn.cursor.return_value.__enter__.return_value = mock_oracle_cursor
+        
+        mock_oracle_pool_instance = MagicMock()
+        mock_oracle_pool_instance.acquire.return_value = mock_oracle_conn
+        mock_oracledb_pool.return_value = mock_oracle_pool_instance
+
+        connector = OracleConnector(ORACLE_USER, ORACLE_PASSWORD, ORACLE_DSN)
+        connector.initialize_pool(min_conn=1, max_conn=1)
+        extractor = SchemaExtractor(connector)
+
+        try:
+            sequences = extractor.get_sequences()
+            self.assertEqual(len(sequences), 1)
+            self.assertEqual(sequences[0]["name"], "SEQ_USERS")
+            self.assertEqual(sequences[0]["min_value"], 1)
+            self.assertEqual(sequences[0]["max_value"], 999999)
+            self.assertEqual(sequences[0]["increment_by"], 1)
+            self.assertEqual(sequences[0]["cycle"], False)
+            self.assertEqual(sequences[0]["cache_size"], 20)
+            self.assertEqual(sequences[0]["last_number"], 42)
+        finally:
+            connector.close_pool()
+
 if __name__ == "__main__":
     unittest.main()

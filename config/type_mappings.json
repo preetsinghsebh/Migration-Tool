@@ -17,7 +17,14 @@
     "BINARY_DOUBLE": "DOUBLE PRECISION",
     "RAW": "BYTEA",
     "LONG": "TEXT",
-    "LONG RAW": "BYTEA"
+    "LONG RAW": "BYTEA",
+    "XMLTYPE": "XML",
+    "SDO_GEOMETRY": "GEOMETRY",
+    "BFILE": "VARCHAR(255)",
+    "ROWID": "VARCHAR(18)",
+    "UROWID": "VARCHAR(18)",
+    "INTERVAL YEAR TO MONTH": "INTERVAL",
+    "INTERVAL DAY TO SECOND": "INTERVAL"
   },
   "fallback": "TEXT"
 }

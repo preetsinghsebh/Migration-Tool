@@ -1,4 +1,5 @@
 import logging
+import json
 from utils.json_utils import write_json_iteratively
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ class SchemaExtractor:
         Retrieves column metadata (name and datatype) for a specific table.
         """
         query = """
-            SELECT column_name, data_type, data_precision, data_scale, nullable
+            SELECT column_name, data_type, data_precision, data_scale, nullable, data_default
             FROM user_tab_columns
             WHERE table_name = :1
         """
@@ -50,13 +51,27 @@ class SchemaExtractor:
                 try:
                     cursor.execute(query, [table_name])
                     for row in cursor:
-                        col_name, d_type, d_prec, d_scale, nullable = row
+                        col_name = row[0]
+                        d_type = row[1]
+                        d_prec = row[2]
+                        d_scale = row[3]
+                        nullable = row[4]
+                        default_val = row[5] if len(row) > 5 else None
+                        
+                        default_val_str = None
+                        if default_val is not None:
+                            try:
+                                default_val_str = str(default_val).strip()
+                            except Exception:
+                                default_val_str = None
+
                         columns.append({
                             "name": col_name,
                             "datatype": d_type,
                             "precision": d_prec,
                             "scale": d_scale,
-                            "nullable": True if nullable == 'Y' else False
+                            "nullable": True if nullable == 'Y' else False,
+                            "default_value": default_val_str
                         })
                 except Exception as e:
                     logger.error(f"Error extracting columns for table {table_name}: {e}")
@@ -133,3 +148,46 @@ class SchemaExtractor:
         tables_exported = write_json_iteratively(output_file_path, schema_gen)
         logger.info(f"Schema extraction completed successfully. {tables_exported} tables exported.")
         return tables_exported
+
+    def get_sequences(self):
+        """
+        Retrieves sequence metadata from the user_sequences view.
+        """
+        query = """
+            SELECT sequence_name, min_value, max_value, increment_by, cycle_flag, cache_size, last_number
+            FROM user_sequences
+        """
+        sequences = []
+        with self.connector.get_connection() as conn:
+            with conn.cursor() as cursor:
+                try:
+                    cursor.execute(query)
+                    for row in cursor:
+                        seq_name, min_val, max_val, increment_by, cycle_flag, cache_size, last_num = row
+                        sequences.append({
+                            "name": seq_name,
+                            "min_value": min_val,
+                            "max_value": max_val,
+                            "increment_by": increment_by,
+                            "cycle": True if cycle_flag == 'Y' else False,
+                            "cache_size": cache_size,
+                            "last_number": last_num
+                        })
+                except Exception as e:
+                    logger.warning(f"Failed to extract sequences from Oracle: {e}")
+        return sequences
+
+    def export_sequences_to_json(self, output_file_path):
+        """
+        Extracts database sequences and writes them to a JSON file.
+        """
+        logger.info(f"Starting sequence extraction to {output_file_path}")
+        sequences = self.get_sequences()
+        try:
+            with open(output_file_path, 'w', encoding='utf-8') as f:
+                json.dump(sequences, f, indent=2)
+            logger.info(f"Sequence extraction completed successfully. {len(sequences)} sequences exported.")
+            return len(sequences)
+        except Exception as e:
+            logger.error(f"Failed to export sequences to JSON: {e}")
+            raise
