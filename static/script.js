@@ -126,6 +126,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const uploadStatus = document.getElementById("upload-status");
     const uploadBtn = document.getElementById("upload-btn");
 
+    // Auto-populate table name from file name when chosen
+    csvFileInput.addEventListener("change", () => {
+        const file = csvFileInput.files[0];
+        if (file && (!tableNameInput.value.trim() || tableNameInput.value === "CUSTOMERS")) {
+            const name = file.name.split('.')[0].toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+            tableNameInput.value = name;
+        }
+    });
+
     uploadForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         
