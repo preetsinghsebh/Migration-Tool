@@ -21,13 +21,13 @@ class MigrationValidator:
         oracle_count = 0
         with self.oracle_connector.get_connection() as conn:
             with conn.cursor() as cursor:
-                cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+                cursor.execute(f'SELECT COUNT(*) FROM "{table_name}"')
                 oracle_count = cursor.fetchone()[0]
                 
         pg_count = 0
         with self.pg_connector.get_connection() as conn:
             with conn.cursor() as cursor:
-                cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+                cursor.execute(f'SELECT COUNT(*) FROM "{table_name}"')
                 pg_count = cursor.fetchone()[0]
                 
         is_valid = oracle_count == pg_count
@@ -46,7 +46,7 @@ class MigrationValidator:
         all_valid = True
         
         for col in columns:
-            query = f"SELECT COUNT(*) FROM {table_name} WHERE {col} IS NULL"
+            query = f'SELECT COUNT(*) FROM "{table_name}" WHERE "{col}" IS NULL'
             
             oracle_nulls = 0
             with self.oracle_connector.get_connection() as conn:
@@ -69,39 +69,94 @@ class MigrationValidator:
             
         return all_valid
         
-    def validate_checksums(self, table_name: str, pk_column: str, columns: List[str], batch_size=10000) -> bool:
+    def _normalize_val(self, val):
+        if val is None:
+            return ""
+        import decimal
+        import datetime
+        if isinstance(val, (decimal.Decimal, float, int)):
+            try:
+                if val % 1 == 0:
+                    return str(int(val))
+                else:
+                    return str(float(val))
+            except Exception:
+                return str(val)
+        if isinstance(val, (datetime.datetime, datetime.date, datetime.time)):
+            return val.isoformat()
+        return str(val)
+        
+    def validate_checksums(self, table_name: str, pk_columns, columns: List[str], batch_size=10000) -> bool:
         """
         Streams rows ordered by primary key, concatenates values, and generates a SHA-256 hash.
         This provides 100% cryptographic proof of data fidelity and avoids cross-database hashing quirks.
         """
+        if isinstance(pk_columns, str):
+            pk_columns = [pk_columns]
+            
         logger.info(f"Validating checksums for {table_name}...")
         
-        col_str = ", ".join(columns)
-        query = f"SELECT {col_str} FROM {table_name} ORDER BY {pk_column}"
+        # 1. Determine PostgreSQL column types to apply COLLATE "C" on text columns for deterministic sorting
+        pg_types = {}
+        try:
+            with self.pg_connector.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = %s",
+                        [table_name]
+                    )
+                    for row in cursor:
+                        pg_types[row[0].upper()] = row[1].upper()
+                    if not pg_types:
+                        cursor.execute(
+                            "SELECT column_name, data_type FROM information_schema.columns WHERE LOWER(table_name) = LOWER(%s)",
+                            [table_name]
+                        )
+                        for row in cursor:
+                            pg_types[row[0].upper()] = row[1].upper()
+        except Exception as e:
+            logger.warning(f"Failed to query column types in Postgres for collation sorting: {e}")
+            
+        col_str = ", ".join(f'"{col}"' for col in columns)
+        
+        # Oracle query: standard ORDER BY (binary collation by default)
+        oracle_order_cols = ", ".join(f'"{col}"' for col in pk_columns)
+        oracle_query = f'SELECT {col_str} FROM "{table_name}" ORDER BY {oracle_order_cols}'
+        
+        # PostgreSQL query: append COLLATE "C" for character columns to match Oracle binary sorting
+        pg_order_cols_list = []
+        for col in pk_columns:
+            col_upper = col.upper()
+            col_type = pg_types.get(col_upper, "")
+            if "CHAR" in col_type or "TEXT" in col_type or "VARCHAR" in col_type:
+                pg_order_cols_list.append(f'"{col}" COLLATE "C"')
+            else:
+                pg_order_cols_list.append(f'"{col}"')
+        pg_order_cols = ", ".join(pg_order_cols_list)
+        pg_query = f'SELECT {col_str} FROM "{table_name}" ORDER BY {pg_order_cols}'
         
         oracle_hash = hashlib.sha256()
         with self.oracle_connector.get_connection() as conn:
             with conn.cursor() as cursor:
-                cursor.execute(query)
+                cursor.execute(oracle_query)
                 while True:
                     rows = cursor.fetchmany(batch_size)
                     if not rows:
                         break
                     for row in rows:
-                        # Convert all elements to string, replace None with empty, and join
-                        row_str = "|".join([str(val) if val is not None else "" for val in row])
+                        row_str = "|".join([self._normalize_val(val) for val in row])
                         oracle_hash.update(row_str.encode('utf-8'))
                         
         pg_hash = hashlib.sha256()
         with self.pg_connector.get_connection() as conn:
             with conn.cursor() as cursor:
-                cursor.execute(query)
+                cursor.execute(pg_query)
                 while True:
                     rows = cursor.fetchmany(batch_size)
                     if not rows:
                         break
                     for row in rows:
-                        row_str = "|".join([str(val) if val is not None else "" for val in row])
+                        row_str = "|".join([self._normalize_val(val) for val in row])
                         pg_hash.update(row_str.encode('utf-8'))
                         
         o_digest = oracle_hash.hexdigest()
@@ -130,8 +185,8 @@ class MigrationValidator:
         pg_columns = {}
         with self.pg_connector.get_connection() as conn:
             with conn.cursor() as cursor:
-                # PG information schema tables are usually lowercase
-                cursor.execute(query, [table_name.lower()])
+                # Use exact casing matching how it was created
+                cursor.execute(query, [table_name])
                 for row in cursor:
                     pg_columns[row[0].upper()] = row[1].upper()
                     

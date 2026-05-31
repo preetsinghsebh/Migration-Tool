@@ -85,10 +85,10 @@ class TestDDLGenerator(unittest.TestCase):
             with open(users_sql_path, 'r', encoding='utf-8') as f:
                 users_sql = f.read()
                 
-            self.assertIn("CREATE TABLE USERS (", users_sql)
-            self.assertIn("ID BIGINT NOT NULL", users_sql)
-            self.assertIn("CONSTRAINT PK_USERS PRIMARY KEY (ID)", users_sql)
-            self.assertIn("CONSTRAINT UQ_USERNAME UNIQUE (USERNAME)", users_sql)
+            self.assertIn('CREATE TABLE "USERS" (', users_sql)
+            self.assertIn('"ID" BIGINT NOT NULL', users_sql)
+            self.assertIn('CONSTRAINT "PK_USERS" PRIMARY KEY ("ID")', users_sql)
+            self.assertIn('CONSTRAINT "UQ_USERNAME" UNIQUE ("USERNAME")', users_sql)
             
             # Verify ORDERS table SQL
             orders_sql_path = os.path.join(output_dir, "tables", "ORDERS.sql")
@@ -96,9 +96,9 @@ class TestDDLGenerator(unittest.TestCase):
             with open(orders_sql_path, 'r', encoding='utf-8') as f:
                 orders_sql = f.read()
                 
-            self.assertIn("CREATE TABLE ORDERS (", orders_sql)
-            self.assertIn("ORDER_ID NUMERIC NOT NULL", orders_sql)
-            self.assertIn("CONSTRAINT PK_ORDERS PRIMARY KEY (ORDER_ID)", orders_sql)
+            self.assertIn('CREATE TABLE "ORDERS" (', orders_sql)
+            self.assertIn('"ORDER_ID" NUMERIC NOT NULL', orders_sql)
+            self.assertIn('CONSTRAINT "PK_ORDERS" PRIMARY KEY ("ORDER_ID")', orders_sql)
             
             # Verify constraints SQL
             constraints_sql_path = os.path.join(output_dir, "constraints.sql")
@@ -106,9 +106,9 @@ class TestDDLGenerator(unittest.TestCase):
             with open(constraints_sql_path, 'r', encoding='utf-8') as f:
                 constraints_sql = f.read()
                 
-            self.assertIn("ALTER TABLE ORDERS", constraints_sql)
-            self.assertIn("ADD CONSTRAINT FK_ORDERS_USER FOREIGN KEY (USER_ID)", constraints_sql)
-            self.assertIn("REFERENCES USERS (ID)", constraints_sql)
+            self.assertIn('ALTER TABLE "ORDERS"', constraints_sql)
+            self.assertIn('ADD CONSTRAINT "FK_ORDERS_USER" FOREIGN KEY ("USER_ID")', constraints_sql)
+            self.assertIn('REFERENCES "USERS" ("ID")', constraints_sql)
             
             self.logger.info("DDL Generator output verified successfully.")
             

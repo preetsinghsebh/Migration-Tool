@@ -16,13 +16,16 @@ class DDLGenerator:
         if not oracle_default:
             return None
         val = oracle_default.upper().strip()
-        if ".NEXTVAL" in val:
-            # Extract sequence name from sequence.nextval
-            idx = oracle_default.upper().rfind(".NEXTVAL")
-            seq_part = oracle_default[:idx].strip()
-            # Remove any double/single quotes
-            seq_part = seq_part.replace('"', '').replace("'", "")
-            return f"DEFAULT nextval('{seq_part}')"
+        if "NEXTVAL" in val:
+            # Remove all quotes first to avoid parsing issues with embedded quotes
+            clean = oracle_default.replace('"', '').replace("'", "").strip()
+            # Remove .NEXTVAL suffix
+            if clean.upper().endswith(".NEXTVAL"):
+                clean = clean[:-8].strip()
+            # Strip schema prefix if present
+            if "." in clean:
+                clean = clean.split(".")[-1].strip()
+            return f"DEFAULT nextval('\"{clean}\"')"
         
         if val == "SYSDATE" or val == "CURRENT_DATE":
             return "DEFAULT CURRENT_TIMESTAMP"
@@ -77,14 +80,22 @@ class DDLGenerator:
                         cache = seq.get("cache_size", 0)
                         last_num = seq.get("last_number")
                         
-                        start_val = last_num if last_num is not None else (min_val if min_val is not None else 1)
+                        PG_MAX_BIGINT = 9223372036854775807
                         
-                        sql = f"CREATE SEQUENCE IF NOT EXISTS {seq_name}\n"
+                        start_val = last_num if last_num is not None else (min_val if min_val is not None else 1)
+                        if start_val > PG_MAX_BIGINT:
+                            start_val = PG_MAX_BIGINT
+                        
+                        sql = f"CREATE SEQUENCE IF NOT EXISTS \"{seq_name}\"\n"
                         sql += f"    START WITH {start_val}\n"
                         sql += f"    INCREMENT BY {increment}\n"
                         if min_val is not None:
+                            if min_val > PG_MAX_BIGINT:
+                                min_val = PG_MAX_BIGINT
                             sql += f"    MINVALUE {min_val}\n"
                         if max_val is not None:
+                            if max_val > PG_MAX_BIGINT:
+                                max_val = PG_MAX_BIGINT
                             sql += f"    MAXVALUE {max_val}\n"
                         if cache > 1:
                             sql += f"    CACHE {cache}\n"
@@ -136,7 +147,8 @@ class DDLGenerator:
             
             with open(output_sql_path, 'w', encoding='utf-8') as f:
                 f.write(f"-- Auto-generated PostgreSQL DDL for {table_name}\n\n")
-                f.write(f"CREATE TABLE {table_name} (\n")
+                f.write(f"DROP TABLE IF EXISTS \"{table_name}\" CASCADE;\n\n")
+                f.write(f"CREATE TABLE \"{table_name}\" (\n")
                 
                 col_defs = []
                 for col in columns:
@@ -148,7 +160,7 @@ class DDLGenerator:
                     
                     pg_type = self.converter.convert_type(oracle_type, precision, scale)
                     
-                    col_def = f"    {col_name} {pg_type}"
+                    col_def = f"    \"{col_name}\" {pg_type}"
                     
                     default_value = col.get("default_value")
                     mapped_default = self._map_default_value(default_value)
@@ -161,32 +173,32 @@ class DDLGenerator:
                 
                 # Append PK/UQ Constraints inside CREATE TABLE
                 for pk in pk_constraints:
-                    cols_str = ", ".join(pk["columns"])
-                    col_defs.append(f"    CONSTRAINT {pk['name']} PRIMARY KEY ({cols_str})")
+                    cols_str = ", ".join(f'"{c}"' for c in pk["columns"])
+                    col_defs.append(f"    CONSTRAINT \"{pk['name']}\" PRIMARY KEY ({cols_str})")
                     
                 for uq in uq_constraints:
-                    cols_str = ", ".join(uq["columns"])
-                    col_defs.append(f"    CONSTRAINT {uq['name']} UNIQUE ({cols_str})")
+                    cols_str = ", ".join(f'"{c}"' for c in uq["columns"])
+                    col_defs.append(f"    CONSTRAINT \"{uq['name']}\" UNIQUE ({cols_str})")
                     
                 f.write(",\n".join(col_defs))
                 f.write("\n);\n\n")
                 
                 # Resolve Foreign Key constraints and save them to be written to constraints.sql
                 for fk in fk_constraints:
-                    cols_str = ", ".join(fk["columns"])
+                    cols_str = ", ".join(f'"{c}"' for c in fk["columns"])
                     ref_constraint = fk.get("r_constraint_name")
                     if ref_constraint and ref_constraint in constraint_map:
                         ref_table, ref_cols = constraint_map[ref_constraint]
-                        ref_cols_str = ", ".join(ref_cols)
+                        ref_cols_str = ", ".join(f'"{c}"' for c in ref_cols)
                         fk_sql = (
-                            f"ALTER TABLE {table_name}\n"
-                            f"    ADD CONSTRAINT {fk['name']} FOREIGN KEY ({cols_str})\n"
-                            f"    REFERENCES {ref_table} ({ref_cols_str});\n\n"
+                            f"ALTER TABLE \"{table_name}\"\n"
+                            f"    ADD CONSTRAINT \"{fk['name']}\" FOREIGN KEY ({cols_str})\n"
+                            f"    REFERENCES \"{ref_table}\" ({ref_cols_str});\n\n"
                         )
                     else:
                         fk_sql = (
-                            f"ALTER TABLE {table_name}\n"
-                            f"    ADD CONSTRAINT {fk['name']} FOREIGN KEY ({cols_str})\n"
+                            f"ALTER TABLE \"{table_name}\"\n"
+                            f"    ADD CONSTRAINT \"{fk['name']}\" FOREIGN KEY ({cols_str})\n"
                             f"    REFERENCES /* TODO: resolve {fk['r_constraint_name']} */;\n\n"
                         )
                     all_fks.append(fk_sql)

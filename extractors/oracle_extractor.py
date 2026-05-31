@@ -38,7 +38,7 @@ class OracleExtractor:
                     cursor.execute(query, params)
                     
                     # Extract column names from the cursor description to convert tuples to dictionaries
-                    columns = [col[0].lower() for col in cursor.description] if cursor.description else []
+                    columns = [col[0] for col in cursor.description] if cursor.description else []
                     
                     batch_num = 1
                     while True:

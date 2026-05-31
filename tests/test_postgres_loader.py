@@ -42,7 +42,7 @@ class TestPostgresLoader(unittest.TestCase):
         # Verify the first call to execute_values
         call_args_1 = mock_execute_values.call_args_list[0][0]
         self.assertEqual(call_args_1[0], self.mock_cursor)
-        self.assertIn("INSERT INTO users (id, name) VALUES %s", call_args_1[1])
+        self.assertIn('INSERT INTO "users" ("id", "name") VALUES %s', call_args_1[1])
         self.assertEqual(call_args_1[2], [[1, "Alice"], [2, "Bob"]])
         
         # Verify commit was called to finalize the transaction

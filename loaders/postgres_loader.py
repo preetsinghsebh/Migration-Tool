@@ -41,12 +41,10 @@ class PostgresLoader:
                         # Extract column names from the first row of the batch
                         columns = list(batch[0].keys())
                         
-                        # Ensure column names are safely quoted if needed, 
-                        # but typically we expect valid identifiers from the schema extractor.
-                        columns_str = ", ".join(columns)
+                        columns_str = ", ".join(f'"{col}"' for col in columns)
                         
                         # Build the INSERT statement template required by execute_values
-                        insert_query = f"INSERT INTO {table_name} ({columns_str}) VALUES %s"
+                        insert_query = f'INSERT INTO "{table_name}" ({columns_str}) VALUES %s'
                         
                         # Convert dictionaries to tuples of values in the correct order
                         values = [[row.get(col) for col in columns] for row in batch]

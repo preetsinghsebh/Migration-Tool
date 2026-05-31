@@ -18,15 +18,13 @@ from validators.migration_validator import MigrationValidator
 logger = logging.getLogger(__name__)
 
 def execute_postgres_scripts(pg_connector, ddl_dir):
-    """Executes generated .sql files against PostgreSQL in a strict dependency order."""
-    logger.info(f"Deploying generated DDL scripts from {ddl_dir} to PostgreSQL...")
+    """Executes generated sequences and table creation scripts against PostgreSQL."""
+    logger.info(f"Deploying generated DDL schema scripts from {ddl_dir} to PostgreSQL...")
     
     # 1. Sequences script first
     sequences_sql = os.path.join(ddl_dir, "sequences.sql")
     # 2. Table creation scripts
     table_sql_files = glob.glob(os.path.join(ddl_dir, "tables", "*.sql"))
-    # 3. Consolidated constraints script last
-    constraints_sql = os.path.join(ddl_dir, "constraints.sql")
     
     order_of_execution = []
     if os.path.exists(sequences_sql):
@@ -34,9 +32,6 @@ def execute_postgres_scripts(pg_connector, ddl_dir):
         
     order_of_execution.extend(sorted(table_sql_files)) # Sort tables alphabetically
     
-    if os.path.exists(constraints_sql):
-        order_of_execution.append(constraints_sql)
-        
     with pg_connector.get_connection() as conn:
         with conn.cursor() as cursor:
             for sql_file in order_of_execution:
@@ -52,6 +47,29 @@ def execute_postgres_scripts(pg_connector, ddl_dir):
                             conn.rollback()
                             raise RuntimeError(f"Failed to execute SQL script: {sql_file}. Error: {e}")
     logger.info("Schema deployment completed.")
+
+def execute_postgres_constraints(pg_connector, ddl_dir):
+    """Executes foreign key constraint scripts against PostgreSQL."""
+    constraints_sql = os.path.join(ddl_dir, "constraints.sql")
+    if not os.path.exists(constraints_sql):
+        logger.info("No constraints script found to deploy.")
+        return
+        
+    logger.info(f"Deploying foreign key constraints from {constraints_sql} to PostgreSQL...")
+    with pg_connector.get_connection() as conn:
+        with conn.cursor() as cursor:
+            logger.info("Executing constraints.sql...")
+            with open(constraints_sql, 'r', encoding='utf-8') as f:
+                sql_content = f.read()
+                if sql_content.strip():
+                    try:
+                        cursor.execute(sql_content)
+                        conn.commit()
+                    except Exception as e:
+                        logger.error(f"Error executing constraints script: {e}")
+                        conn.rollback()
+                        raise RuntimeError(f"Failed to execute constraints SQL script. Error: {e}")
+    logger.info("Constraints deployment completed.")
 
 def sync_postgres_sequences(pg_connector):
     """
@@ -95,7 +113,7 @@ def sync_postgres_sequences(pg_connector):
                         continue
                     seq_name = match.group(1)
                     
-                    cursor.execute(f"SELECT COALESCE(MAX({column_name}), 0) FROM {table_name}")
+                    cursor.execute(f'SELECT COALESCE(MAX("{column_name}"), 0) FROM "{table_name}"')
                     max_val = cursor.fetchone()[0]
                     
                     if max_val > 0:
@@ -132,14 +150,14 @@ def main():
     logger.info("Phase 0: Initializing database connections...")
     
     oracle_user = os.getenv("ORACLE_USER", "system")
-    oracle_pass = os.getenv("ORACLE_PASS", "password")
+    oracle_pass = os.getenv("ORACLE_PASSWORD", os.getenv("ORACLE_PASS", "password"))
     oracle_dsn = os.getenv("ORACLE_DSN", "localhost:1521/XEPDB1")
     
     pg_host = os.getenv("PG_HOST", "localhost")
     pg_port = os.getenv("PG_PORT", "5432")
-    pg_dbname = os.getenv("PG_DBNAME", "postgres")
+    pg_dbname = os.getenv("PG_DB", os.getenv("PG_DBNAME", "postgres"))
     pg_user = os.getenv("PG_USER", "postgres")
-    pg_pass = os.getenv("PG_PASS", "password")
+    pg_pass = os.getenv("PG_PASSWORD", os.getenv("PG_PASS", "password"))
     
     oracle_connector = OracleConnector(oracle_user, oracle_pass, oracle_dsn)
     pg_connector = PostgresConnector(pg_host, pg_port, pg_dbname, pg_user, pg_pass)
@@ -184,6 +202,10 @@ def main():
         # 5.5. Sequence Syncing
         logger.info("\n=== Phase 5.5: Sequence Synchronization ===")
         sync_postgres_sequences(pg_connector)
+        
+        # 5.6. Deploy Constraints
+        logger.info("\n=== Phase 5.6: Constraints Deployment ===")
+        execute_postgres_constraints(pg_connector, ddl_output_dir)
             
         # 6. Validation
         logger.info("\n=== Phase 6: Data Validation ===")
@@ -192,14 +214,16 @@ def main():
         
         for table_dict in schema_data:
             table_name = table_dict["table_name"]
-            pk_column = None
+            pk_columns = []
             for constraint in table_dict.get("constraints", []):
                 if constraint.get("type") == "P":
                     cols = constraint.get("columns", [])
                     if cols:
-                        pk_column = cols[0]
+                        pk_columns = cols
                     else:
-                        pk_column = constraint.get("column_name")
+                        col_name = constraint.get("column_name")
+                        if col_name:
+                            pk_columns = [col_name]
                     break
             
             columns = [col["name"] for col in table_dict.get("columns", [])]
@@ -211,8 +235,8 @@ def main():
             if not validator.validate_datatype_mismatches(table_name, table_dict):
                 validation_failures += 1
             
-            if pk_column:
-                if not validator.validate_checksums(table_name, pk_column, columns):
+            if pk_columns:
+                if not validator.validate_checksums(table_name, pk_columns, columns):
                     validation_failures += 1
             else:
                 logger.warning(f"Skipping checksum validation for {table_name} due to missing Primary Key.")

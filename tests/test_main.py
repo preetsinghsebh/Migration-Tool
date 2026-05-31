@@ -51,7 +51,7 @@ class TestMainOrchestrator(unittest.TestCase):
         # Ensure validator was called correctly on the table
         mock_validator_instance.validate_row_counts.assert_called_with("TEST_TABLE")
         mock_validator_instance.validate_null_mismatches.assert_called_with("TEST_TABLE", ["ID"])
-        mock_validator_instance.validate_checksums.assert_called_with("TEST_TABLE", "ID", ["ID"])
+        mock_validator_instance.validate_checksums.assert_called_with("TEST_TABLE", ["ID"], ["ID"])
         
 if __name__ == "__main__":
     unittest.main()
